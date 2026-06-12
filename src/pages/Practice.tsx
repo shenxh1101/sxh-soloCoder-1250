@@ -18,6 +18,11 @@ export function Practice() {
   const urlPlayerName = searchParams.get('player');
   const urlRecordType = searchParams.get('type') as RecordType | null;
   const backTo = searchParams.get('backTo');
+  const targetType = searchParams.get('targetType') as 'keys' | 'function' | null;
+  const targetKey = searchParams.get('targetKey') || undefined;
+  const targetKeyTyped = searchParams.get('targetKeyTyped') || undefined;
+  const targetFunction = searchParams.get('targetFunction') || undefined;
+  const beforeChallengeId = searchParams.get('beforeChallengeId') || undefined;
 
   const { getSnippetById, currentPlayer, saveRecord, setCurrentRecord, getRecordsForPlayer } = useAppStore();
   const snippet = id ? getSnippetById(id) : undefined;
@@ -44,17 +49,39 @@ export function Practice() {
   }) => {
     if (!snippet) return;
 
+    const trainingMeta = activeRecordType === 'training' && targetType
+      ? {
+          targetType,
+          targetKey,
+          targetKeyTyped,
+          targetFunction,
+          beforeChallengeId,
+        }
+      : undefined;
+
     const record = saveRecord({
       snippetId: snippet.id,
       snippetTitle: snippet.title,
       playerName: activePlayer,
       recordType: activeRecordType,
+      trainingMeta,
       ...stats,
     });
 
     setCurrentRecord(record);
     setFinishedRecord(record);
-  }, [snippet, activePlayer, activeRecordType, saveRecord, setCurrentRecord]);
+  }, [
+    snippet,
+    activePlayer,
+    activeRecordType,
+    saveRecord,
+    setCurrentRecord,
+    targetType,
+    targetKey,
+    targetKeyTyped,
+    targetFunction,
+    beforeChallengeId,
+  ]);
 
   const {
     status,

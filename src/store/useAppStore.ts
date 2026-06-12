@@ -33,6 +33,7 @@ interface AppState {
   getChallengeRecords: () => TypingRecord[];
   getTrainingRecords: () => TypingRecord[];
   getRecordsForPlayer: (playerName: string, recordType?: RecordType) => TypingRecord[];
+  getRecordById: (id: string) => TypingRecord | undefined;
   setCurrentRecord: (record: TypingRecord | null) => void;
   recomputePlayers: () => void;
 }
@@ -163,12 +164,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     saveRecordToStorage(newRecord);
 
+    set((state) => ({
+      records: [...state.records, newRecord],
+      currentRecord: newRecord,
+    }));
+
     if (recordType === 'challenge') {
       get().recomputePlayers();
-    } else {
-      set((state) => ({
-        records: [...state.records, newRecord],
-      }));
     }
 
     return newRecord;
@@ -202,6 +204,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (recordType && r.recordType !== recordType) return false;
       return true;
     }).sort((a, b) => a.timestamp - b.timestamp);
+  },
+
+  getRecordById: (id) => {
+    return get().records.find((r) => r.id === id);
   },
 
   setCurrentRecord: (record) => {

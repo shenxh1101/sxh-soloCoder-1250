@@ -2,6 +2,15 @@ export type Language = 'python' | 'javascript' | 'go' | 'rust' | 'java' | 'custo
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type RecordType = 'challenge' | 'training';
 
+export interface TrainingMeta {
+  targetType: 'keys' | 'function';
+  targetKey?: string;
+  targetKeyTyped?: string;
+  targetFunction?: string;
+  beforeChallengeId?: string;
+  afterChallengeId?: string;
+}
+
 export interface CodeSnippet {
   id: string;
   title: string;
@@ -42,6 +51,7 @@ export interface TypingRecord {
   functionStats: FunctionStat[];
   timestamp: number;
   recordType: RecordType;
+  trainingMeta?: TrainingMeta;
 }
 
 export interface Player {
@@ -74,4 +84,5 @@ export interface Tournament {
   currentPlayerIndex: number;
   status: TournamentStatus;
   createdAt: number;
+  finishedAt?: number;
 }

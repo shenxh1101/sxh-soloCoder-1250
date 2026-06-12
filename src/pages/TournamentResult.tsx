@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Trophy, Medal, Home, RotateCcw, ChevronDown, ChevronUp, Zap, Target, Clock, AlertTriangle, TrendingDown, BarChart3, Award, Code } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Trophy, Medal, Home, RotateCcw, ChevronDown, ChevronUp, Zap, Target, Clock, AlertTriangle, TrendingDown, BarChart3, Award, Code, Copy, CheckCircle, Share2, ExternalLink } from 'lucide-react';
 import { useTournamentStore } from '../store/useTournamentStore';
 import { TournamentPlayer } from '../types';
 
 export function TournamentResult() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { tournament, resetTournament, getRankedPlayers } = useTournamentStore();
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   if (!tournament) {
     return (
@@ -21,6 +23,25 @@ export function TournamentResult() {
       </div>
     );
   }
+
+  const shareUrl = `${window.location.origin}${location.pathname}?id=${encodeURIComponent(tournament.id)}`;
+
+  const handleCopyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }
+  };
 
   const rankedPlayers = getRankedPlayers();
   const finishedPlayers = rankedPlayers.filter(p => p.record);
@@ -112,8 +133,11 @@ export function TournamentResult() {
   const accGap = winner && second ? (winner.record?.accuracy ?? 0) - (second.record?.accuracy ?? 0) : 0;
 
   const handleSameSnippet = () => {
+    const playerNames = tournament.players.map(p => p.name).join(',');
     resetTournament();
-    navigate(`/tournament?snippet=${encodeURIComponent(tournament.snippetId)}`);
+    navigate(
+      `/tournament?snippet=${encodeURIComponent(tournament.snippetId)}&players=${encodeURIComponent(playerNames)}`
+    );
   };
 
   return (
@@ -124,7 +148,33 @@ export function TournamentResult() {
             <Trophy className="w-10 h-10 text-yellow-400" />
           </div>
           <h1 className="text-3xl font-bold text-cyber-text mb-2">比赛结束！</h1>
-          <p className="text-cyber-textMuted">{tournament.snippetTitle}</p>
+          <p className="text-cyber-textMuted mb-6">{tournament.snippetTitle}</p>
+          <div className="max-w-2xl mx-auto">
+            <div className="card-neon px-4 py-3 flex items-center gap-3">
+              <Share2 size={18} className="text-cyber-secondary flex-shrink-0" />
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs uppercase tracking-wider text-cyber-textMuted mb-0.5">可分享赛后报告</p>
+                <p className="text-xs font-mono text-cyber-text truncate">{shareUrl}</p>
+              </div>
+              <button
+                onClick={handleCopyShare}
+                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  copied
+                    ? 'bg-cyber-success/15 border-cyber-success/50 text-cyber-success'
+                    : 'bg-cyber-secondary/10 border-cyber-secondary/40 text-cyber-secondary hover:bg-cyber-secondary/20'
+                }`}
+              >
+                {copied ? (
+                  <span className="flex items-center gap-1.5"><CheckCircle size={16} /> 已复制</span>
+                ) : (
+                  <span className="flex items-center gap-1.5"><Copy size={16} /> 复制链接</span>
+                )}
+              </button>
+            </div>
+            <p className="mt-2 text-[11px] text-cyber-textMuted">
+              链接保存在本地，刷新或重新打开均可查看（含总榜、失误摘要、关键差距）
+            </p>
+          </div>
         </div>
 
         {finishedPlayers.length >= 2 && (

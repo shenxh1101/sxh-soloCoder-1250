@@ -1,9 +1,11 @@
-import { CodeSnippet, TypingRecord, Player } from '../types';
+import { CodeSnippet, TypingRecord, Player, Tournament } from '../types';
 
 const SNIPPETS_KEY = 'codetype_snippets';
 const RECORDS_KEY = 'codetype_records';
 const CURRENT_PLAYER_KEY = 'codetype_current_player';
 const PLAYERS_KEY = 'codetype_players';
+const TOURNAMENTS_KEY = 'codetype_tournaments';
+const ACTIVE_TOURNAMENT_KEY = 'codetype_active_tournament';
 
 export function getCustomSnippets(): CodeSnippet[] {
   try {
@@ -108,4 +110,46 @@ export function updatePlayerStats(record: TypingRecord): void {
 
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
+
+export function getAllTournaments(): Tournament[] {
+  try {
+    const data = localStorage.getItem(TOURNAMENTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getTournamentById(id: string): Tournament | null {
+  const list = getAllTournaments();
+  return list.find(t => t.id === id) || null;
+}
+
+export function saveTournament(tournament: Tournament): void {
+  const list = getAllTournaments();
+  const idx = list.findIndex(t => t.id === tournament.id);
+  if (idx >= 0) {
+    list[idx] = tournament;
+  } else {
+    list.unshift(tournament);
+  }
+  localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(list));
+}
+
+export function deleteTournament(id: string): void {
+  const list = getAllTournaments().filter(t => t.id !== id);
+  localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(list));
+}
+
+export function getActiveTournamentId(): string | null {
+  return localStorage.getItem(ACTIVE_TOURNAMENT_KEY);
+}
+
+export function setActiveTournamentId(id: string | null): void {
+  if (id) {
+    localStorage.setItem(ACTIVE_TOURNAMENT_KEY, id);
+  } else {
+    localStorage.removeItem(ACTIVE_TOURNAMENT_KEY);
+  }
 }

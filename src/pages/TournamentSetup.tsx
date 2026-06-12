@@ -10,6 +10,7 @@ export function TournamentSetup() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const preselectId = searchParams.get('snippet');
+  const preselectPlayers = searchParams.get('players');
   const { snippets, getSnippetById } = useAppStore();
   const { createTournament } = useTournamentStore();
 
@@ -19,14 +20,26 @@ export function TournamentSetup() {
   const [newPlayerName, setNewPlayerName] = useState('');
 
   useEffect(() => {
+    let didChange = false;
     if (preselectId && !selectedSnippet) {
       const snip = getSnippetById(preselectId);
       if (snip) {
         setSelectedSnippet(snip);
         setStep('players');
+        didChange = true;
       }
     }
-  }, [preselectId, getSnippetById, selectedSnippet]);
+    if (preselectPlayers) {
+      const parsed = preselectPlayers
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (parsed.length > 0) {
+        setPlayerNames(parsed);
+        didChange = true;
+      }
+    }
+  }, [preselectId, preselectPlayers, getSnippetById, selectedSnippet]);
 
   const handleAddPlayer = () => {
     const name = newPlayerName.trim();

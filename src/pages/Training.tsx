@@ -224,9 +224,35 @@ export function Training() {
     const added = snippets[snippets.length - 1];
     if (added) {
       const backTo = `/training-archive/${encodeURIComponent(playerName)}`;
-      navigate(
-        `/practice/${added.id}?player=${encodeURIComponent(playerName)}&type=training&backTo=${encodeURIComponent(backTo)}`
-      );
+
+      const playerRecords = useAppStore
+        .getState()
+        .records.filter(
+          (r) => r.playerName === playerName && r.recordType === 'challenge'
+        )
+        .sort((a, b) => b.timestamp - a.timestamp);
+      const beforeChallengeId = playerRecords[0]?.id;
+
+      const params = new URLSearchParams();
+      params.set('player', playerName);
+      params.set('type', 'training');
+      params.set('backTo', backTo);
+      params.set('targetType', ts.type);
+      if (beforeChallengeId) {
+        params.set('beforeChallengeId', beforeChallengeId);
+      }
+      if (ts.type === 'keys' && analysis.errors.length > 0) {
+        params.set('targetKey', analysis.errors[0].expected);
+        params.set('targetKeyTyped', analysis.errors[0].typed);
+      }
+      if (ts.type === 'functions' && analysis.weakFuncs.length > 0) {
+        // 从 title 解析："专项训练 - xxx()"
+        const match = ts.title.match(/^专项训练\s*-\s*(.+?)\(\)$/);
+        const fname = match ? match[1] : analysis.weakFuncs[0].name;
+        params.set('targetFunction', fname);
+      }
+
+      navigate(`/practice/${added.id}?${params.toString()}`);
     }
   };
 

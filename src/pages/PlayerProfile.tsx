@@ -13,6 +13,7 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Dumbbell,
   ListChecks,
 } from 'lucide-react';
@@ -510,6 +511,96 @@ export function PlayerProfile() {
                               </Link>
                             ))}
                           </div>
+
+                          {/* 相关训练时间线 */}
+                          {(() => {
+                            // 找针对这个键位的训练
+                            const relatedTrainings = allPlayerRecords.filter(
+                              (r) =>
+                                r.recordType === 'training' &&
+                                r.trainingMeta?.targetType === 'keys' &&
+                                r.trainingMeta?.targetKey === err.expected
+                            );
+                            if (relatedTrainings.length === 0) return null;
+
+                            type Node =
+                              | { kind: 'challenge'; rec: TypingRecord; count?: number }
+                              | { kind: 'training'; rec: TypingRecord };
+
+                            const nodes: Node[] = [];
+                            relatedTrainings
+                              .sort((a, b) => a.timestamp - b.timestamp)
+                              .forEach((tr) => {
+                                // 前一场
+                                const before = tr.trainingMeta?.beforeChallengeId
+                                  ? allPlayerRecords.find(
+                                      (r) => r.id === tr.trainingMeta!.beforeChallengeId
+                                    )
+                                  : null;
+                                if (before) {
+                                  const match = before.errors.find(
+                                    (e) => e.expected === err.expected && e.typed === err.typed
+                                  );
+                                  nodes.push({ kind: 'challenge', rec: before, count: match?.count ?? 0 });
+                                }
+                                nodes.push({ kind: 'training', rec: tr });
+                                // 后一场
+                                const after = allPlayerRecords
+                                  .filter(
+                                    (r) =>
+                                      r.recordType === 'challenge' && r.timestamp > tr.timestamp
+                                  )
+                                  .sort((a, b) => a.timestamp - b.timestamp)[0];
+                                if (after) {
+                                  const match = after.errors.find(
+                                    (e) => e.expected === err.expected && e.typed === err.typed
+                                  );
+                                  nodes.push({ kind: 'challenge', rec: after, count: match?.count ?? 0 });
+                                }
+                              });
+
+                            return (
+                              <div className="mt-5 pt-3 border-t border-dashed border-cyber-border/50">
+                                <p className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-2 flex items-center gap-1">
+                                  <Dumbbell size={11} />
+                                  训练效果时间线（{relatedTrainings.length} 次相关训练）
+                                </p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {nodes.map((n, i) => (
+                                    <div key={i} className="flex items-center gap-1.5">
+                                      {n.kind === 'challenge' ? (
+                                        <Link
+                                          to={`/record/${n.rec.id}`}
+                                          className="px-2 py-1 rounded-md text-[11px] bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/30 hover:bg-cyber-primary/20 transition-colors"
+                                        >
+                                          <span className="font-mono">挑战</span>
+                                          {n.count !== undefined && (
+                                            <span className="ml-1 text-cyber-error">×{n.count}</span>
+                                          )}
+                                        </Link>
+                                      ) : (
+                                        <Link
+                                          to={`/record/${n.rec.id}`}
+                                          className="px-2 py-1 rounded-md text-[11px] bg-cyber-warning/10 text-cyber-warning border border-cyber-warning/30 hover:bg-cyber-warning/20 transition-colors font-mono"
+                                        >
+                                          🎯 专项训练
+                                        </Link>
+                                      )}
+                                      {i < nodes.length - 1 && (
+                                        <ChevronRight size={12} className="text-cyber-border" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <Link
+                                  to={`/training-archive/${encodeURIComponent(resolvedName)}`}
+                                  className="inline-flex items-center gap-1 text-[10px] text-cyber-secondary hover:text-cyber-secondary/80 mt-2"
+                                >
+                                  查看完整训练档案 <ChevronRight size={10} />
+                                </Link>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -615,6 +706,107 @@ export function PlayerProfile() {
                               </Link>
                             ))}
                           </div>
+
+                          {/* 相关训练时间线 */}
+                          {(() => {
+                            const relatedTrainings = allPlayerRecords.filter(
+                              (r) =>
+                                r.recordType === 'training' &&
+                                r.trainingMeta?.targetType === 'function' &&
+                                r.trainingMeta?.targetFunction === func.name
+                            );
+                            if (relatedTrainings.length === 0) return null;
+
+                            type Node =
+                              | { kind: 'challenge'; rec: TypingRecord; acc?: number }
+                              | { kind: 'training'; rec: TypingRecord };
+
+                            const nodes: Node[] = [];
+                            relatedTrainings
+                              .sort((a, b) => a.timestamp - b.timestamp)
+                              .forEach((tr) => {
+                                const before = tr.trainingMeta?.beforeChallengeId
+                                  ? allPlayerRecords.find(
+                                      (r) => r.id === tr.trainingMeta!.beforeChallengeId
+                                    )
+                                  : null;
+                                if (before) {
+                                  const f = before.functionStats.find((s) => s.name === func.name);
+                                  nodes.push({
+                                    kind: 'challenge',
+                                    rec: before,
+                                    acc: f && f.totalChars > 0 ? f.accuracy : undefined,
+                                  });
+                                }
+                                nodes.push({ kind: 'training', rec: tr });
+                                const after = allPlayerRecords
+                                  .filter(
+                                    (r) =>
+                                      r.recordType === 'challenge' && r.timestamp > tr.timestamp
+                                  )
+                                  .sort((a, b) => a.timestamp - b.timestamp)[0];
+                                if (after) {
+                                  const f = after.functionStats.find((s) => s.name === func.name);
+                                  nodes.push({
+                                    kind: 'challenge',
+                                    rec: after,
+                                    acc: f && f.totalChars > 0 ? f.accuracy : undefined,
+                                  });
+                                }
+                              });
+
+                            return (
+                              <div className="mt-5 pt-3 border-t border-dashed border-cyber-border/50">
+                                <p className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-2 flex items-center gap-1">
+                                  <Dumbbell size={11} />
+                                  训练效果时间线（{relatedTrainings.length} 次相关训练）
+                                </p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {nodes.map((n, i) => (
+                                    <div key={i} className="flex items-center gap-1.5">
+                                      {n.kind === 'challenge' ? (
+                                        <Link
+                                          to={`/record/${n.rec.id}`}
+                                          className="px-2 py-1 rounded-md text-[11px] bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/30 hover:bg-cyber-primary/20 transition-colors"
+                                        >
+                                          <span className="font-mono">挑战</span>
+                                          {n.acc !== undefined && (
+                                            <span
+                                              className={`ml-1 font-mono ${
+                                                n.acc >= 90
+                                                  ? 'text-cyber-success'
+                                                  : n.acc >= 70
+                                                    ? 'text-cyber-warning'
+                                                    : 'text-cyber-error'
+                                              }`}
+                                            >
+                                              {n.acc.toFixed(0)}%
+                                            </span>
+                                          )}
+                                        </Link>
+                                      ) : (
+                                        <Link
+                                          to={`/record/${n.rec.id}`}
+                                          className="px-2 py-1 rounded-md text-[11px] bg-cyber-secondary/10 text-cyber-secondary border border-cyber-secondary/30 hover:bg-cyber-secondary/20 transition-colors font-mono"
+                                        >
+                                          🎯 {func.name}()专项
+                                        </Link>
+                                      )}
+                                      {i < nodes.length - 1 && (
+                                        <ChevronRight size={12} className="text-cyber-border" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <Link
+                                  to={`/training-archive/${encodeURIComponent(resolvedName)}`}
+                                  className="inline-flex items-center gap-1 text-[10px] text-cyber-secondary hover:text-cyber-secondary/80 mt-2"
+                                >
+                                  查看完整训练档案 <ChevronRight size={10} />
+                                </Link>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

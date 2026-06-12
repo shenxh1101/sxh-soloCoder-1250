@@ -94,7 +94,7 @@ const formatTime = (seconds: number) => {
 export function TrainingArchive() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const { players, currentPlayer, setCurrentPlayer, getRecordsForPlayer } = useAppStore();
+  const { players, currentPlayer, setCurrentPlayer, getRecordsForPlayer, getRecordById } = useAppStore();
 
   const resolvedName = useMemo(() => {
     if (name) return decodeURIComponent(name);
@@ -279,6 +279,70 @@ export function TrainingArchive() {
                 const weakFuncDiff = beforeData.weakFunctionCount - afterData.weakFunctionCount;
                 const funcAccDiff = afterData.avgFunctionAccuracy - beforeData.avgFunctionAccuracy;
 
+                const meta = record.trainingMeta;
+                const isKeys = meta?.targetType === 'keys';
+                const isFunc = meta?.targetType === 'function';
+
+                // 解析目标薄弱点（兼容老数据：从标题推断）
+                let targetText = '';
+                let targetDetail = '';
+                if (meta?.targetType === 'keys' && meta.targetKey) {
+                  targetText = `薄弱键位：${displayChar(meta.targetKey)}`;
+                  if (meta.targetKeyTyped) {
+                    targetDetail = `常误按为 ${displayChar(meta.targetKeyTyped)}`;
+                  }
+                } else if (meta?.targetType === 'function' && meta.targetFunction) {
+                  targetText = `薄弱函数：${meta.targetFunction}()`;
+                } else {
+                  const titleMatch = record.snippetTitle.match(/^专项训练\s*-\s*(.+)$/);
+                  if (titleMatch) targetText = titleMatch[1];
+                }
+
+                // 正式挑战前后对比
+                const playerAll = getRecordsForPlayer(resolvedName);
+                const beforeChallenge = meta?.beforeChallengeId
+                  ? getRecordById(meta.beforeChallengeId)
+                  : null;
+                const afterChallenge = playerAll
+                  .filter(
+                    (r) =>
+                      r.recordType === 'challenge' &&
+                      r.timestamp > record.timestamp &&
+                      r.id !== meta?.beforeChallengeId
+                  )
+                  .sort((a, b) => a.timestamp - b.timestamp)[0];
+
+                // 计算同一个键/函数在前后 challenge 中的变化
+                const targetKeyBeforeCount = (() => {
+                  if (!isKeys || !meta?.targetKey || !beforeChallenge) return null;
+                  const match = beforeChallenge.errors.find(
+                    (e) =>
+                      e.expected === meta.targetKey &&
+                      (meta.targetKeyTyped ? e.typed === meta.targetKeyTyped : true)
+                  );
+                  return match ? match.count : 0;
+                })();
+                const targetKeyAfterCount = (() => {
+                  if (!isKeys || !meta?.targetKey || !afterChallenge) return null;
+                  const match = afterChallenge.errors.find(
+                    (e) =>
+                      e.expected === meta.targetKey &&
+                      (meta.targetKeyTyped ? e.typed === meta.targetKeyTyped : true)
+                  );
+                  return match ? match.count : 0;
+                })();
+
+                const targetFuncBeforeAcc = (() => {
+                  if (!isFunc || !meta?.targetFunction || !beforeChallenge) return null;
+                  const f = beforeChallenge.functionStats.find((s) => s.name === meta.targetFunction);
+                  return f && f.totalChars > 0 ? f.accuracy : null;
+                })();
+                const targetFuncAfterAcc = (() => {
+                  if (!isFunc || !meta?.targetFunction || !afterChallenge) return null;
+                  const f = afterChallenge.functionStats.find((s) => s.name === meta.targetFunction);
+                  return f && f.totalChars > 0 ? f.accuracy : null;
+                })();
+
                 const beforeTopErrors = (() => {
                   const errMap = new Map<string, number>();
                   beforeRecords.forEach((r) => {
@@ -325,6 +389,25 @@ export function TrainingArchive() {
                   <div key={record.id} className="card-neon p-6">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold border ${
+                              isKeys
+                                ? 'bg-cyber-error/15 text-cyber-error border-cyber-error/30'
+                                : isFunc
+                                  ? 'bg-cyber-secondary/15 text-cyber-secondary border-cyber-secondary/30'
+                                  : 'bg-cyber-primary/15 text-cyber-primary border-cyber-primary/30'
+                            }`}
+                          >
+                            {isKeys ? '薄弱键位专项' : isFunc ? '薄弱函数专项' : '专项训练'}
+                          </span>
+                          {targetText && (
+                            <span className="text-sm text-cyber-text font-mono">{targetText}</span>
+                          )}
+                        </div>
+                        {targetDetail && (
+                          <p className="text-xs text-cyber-textMuted mb-1">{targetDetail}</p>
+                        )}
                         <h3 className="text-lg font-semibold text-cyber-text truncate">
                           {record.snippetTitle}
                         </h3>
@@ -381,6 +464,181 @@ export function TrainingArchive() {
                         )}
                       </div>
                     </div>
+
+                    {/* 正式挑战前后对比时间线 */}
+                    {(beforeChallenge || afterChallenge) && (
+                      <div className="mb-5 p-4 rounded-xl bg-gradient-to-br from-cyber-bgAlt/50 to-transparent border border-cyber-border/50">
+                        <h4 className="text-sm font-semibold text-cyber-text mb-3 flex items-center gap-2">
+                          <Target size={15} className="text-cyber-primary" />
+                          正式挑战变化对比
+                          {(targetKeyBeforeCount !== null || targetFuncBeforeAcc !== null) && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyber-primary/15 text-cyber-primary border border-cyber-primary/30 font-normal">
+                              训练目标
+                            </span>
+                          )}
+                        </h4>
+                        <div className="grid md:grid-cols-3 gap-3 items-stretch">
+                          <Link
+                            to={beforeChallenge ? `/record/${beforeChallenge.id}` : '#'}
+                            className={`p-3 rounded-lg border bg-cyber-bg transition-all ${
+                              beforeChallenge
+                                ? 'border-cyber-border hover:border-cyber-primary/60 cursor-pointer'
+                                : 'border-dashed border-cyber-border/40 opacity-60'
+                            }`}
+                          >
+                            <div className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-1 flex items-center gap-1">
+                              {beforeChallenge ? (
+                                <>训练前正式挑战 <ChevronRight size={10} /></>
+                              ) : (
+                                '训练前挑战'
+                              )}
+                            </div>
+                            {beforeChallenge ? (
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-cyber-primary">
+                                  {beforeChallenge.cpm} CPM ·{' '}
+                                  <span className="font-mono">{beforeChallenge.accuracy.toFixed(1)}%</span>
+                                </p>
+                                {targetKeyBeforeCount !== null && (
+                                  <p className="text-xs">
+                                    目标键错误：
+                                    <span className="text-cyber-error font-mono ml-1">
+                                      {targetKeyBeforeCount} 次
+                                    </span>
+                                  </p>
+                                )}
+                                {targetFuncBeforeAcc !== null && (
+                                  <p className="text-xs">
+                                    目标函数：
+                                    <span
+                                      className={`font-mono ml-1 ${
+                                        targetFuncBeforeAcc >= 90
+                                          ? 'text-cyber-success'
+                                          : targetFuncBeforeAcc >= 70
+                                            ? 'text-cyber-warning'
+                                            : 'text-cyber-error'
+                                      }`}
+                                    >
+                                      {targetFuncBeforeAcc.toFixed(1)}%
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-cyber-textMuted/70">训练前无正式挑战</p>
+                            )}
+                          </Link>
+
+                          <div className="p-3 rounded-lg border border-dashed border-cyber-primary/30 bg-cyber-primary/5 flex flex-col items-center justify-center text-center">
+                            <Dumbbell size={18} className="text-cyber-primary mb-1" />
+                            <p className="text-[11px] text-cyber-primary font-medium">
+                              专项训练 {record.cpm} CPM
+                            </p>
+                            <p className="text-[10px] text-cyber-textMuted mt-0.5">
+                              {record.accuracy.toFixed(1)}% 正确率
+                            </p>
+                          </div>
+
+                          <Link
+                            to={afterChallenge ? `/record/${afterChallenge.id}` : '#'}
+                            className={`p-3 rounded-lg border bg-cyber-bg transition-all ${
+                              afterChallenge
+                                ? 'border-cyber-border hover:border-cyber-success/60 cursor-pointer'
+                                : 'border-dashed border-cyber-border/40 opacity-60'
+                            }`}
+                          >
+                            <div className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-1 flex items-center gap-1">
+                              {afterChallenge ? (
+                                <>训练后正式挑战 <ChevronRight size={10} /></>
+                              ) : (
+                                '训练后挑战'
+                              )}
+                            </div>
+                            {afterChallenge ? (
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-cyber-success">
+                                  {afterChallenge.cpm} CPM ·{' '}
+                                  <span className="font-mono">{afterChallenge.accuracy.toFixed(1)}%</span>
+                                </p>
+                                {targetKeyAfterCount !== null && targetKeyBeforeCount !== null && (
+                                  <p className="text-xs">
+                                    目标键错误：
+                                    <span
+                                      className={`font-mono ml-1 ${
+                                        targetKeyAfterCount < targetKeyBeforeCount
+                                          ? 'text-cyber-success'
+                                          : targetKeyAfterCount > targetKeyBeforeCount
+                                            ? 'text-cyber-error'
+                                            : 'text-cyber-textMuted'
+                                      }`}
+                                    >
+                                      {targetKeyAfterCount} 次
+                                      {targetKeyBeforeCount - targetKeyAfterCount !== 0 && (
+                                        <span className="ml-1">
+                                          ({targetKeyAfterCount < targetKeyBeforeCount ? '↓' : '↑'}{' '}
+                                          {Math.abs(targetKeyBeforeCount - targetKeyAfterCount)})
+                                        </span>
+                                      )}
+                                    </span>
+                                  </p>
+                                )}
+                                {targetKeyAfterCount !== null && targetKeyBeforeCount === null && (
+                                  <p className="text-xs">
+                                    目标键错误：
+                                    <span className="text-cyber-error font-mono ml-1">
+                                      {targetKeyAfterCount} 次
+                                    </span>
+                                  </p>
+                                )}
+                                {targetFuncAfterAcc !== null && targetFuncBeforeAcc !== null && (
+                                  <p className="text-xs">
+                                    目标函数：
+                                    <span
+                                      className={`font-mono ml-1 ${
+                                        targetFuncAfterAcc >= 90
+                                          ? 'text-cyber-success'
+                                          : targetFuncAfterAcc >= 70
+                                            ? 'text-cyber-warning'
+                                            : 'text-cyber-error'
+                                      }`}
+                                    >
+                                      {targetFuncAfterAcc.toFixed(1)}%
+                                      {Math.abs(targetFuncAfterAcc - targetFuncBeforeAcc) >= 0.5 && (
+                                        <span className="ml-1">
+                                          ({targetFuncAfterAcc > targetFuncBeforeAcc ? '↑' : '↓'}{' '}
+                                          {Math.abs(targetFuncAfterAcc - targetFuncBeforeAcc).toFixed(1)}
+                                          %)
+                                        </span>
+                                      )}
+                                    </span>
+                                  </p>
+                                )}
+                                {targetFuncAfterAcc !== null && targetFuncBeforeAcc === null && (
+                                  <p className="text-xs">
+                                    目标函数：
+                                    <span
+                                      className={`font-mono ml-1 ${
+                                        targetFuncAfterAcc >= 90
+                                          ? 'text-cyber-success'
+                                          : targetFuncAfterAcc >= 70
+                                            ? 'text-cyber-warning'
+                                            : 'text-cyber-error'
+                                      }`}
+                                    >
+                                      {targetFuncAfterAcc.toFixed(1)}%
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-cyber-textMuted/70">
+                                等待下次正式挑战，效果将在这里显示
+                              </p>
+                            )}
+                          </Link>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-3 gap-3 mb-5">
                       <div className="bg-cyber-bg rounded-lg p-3 text-center">

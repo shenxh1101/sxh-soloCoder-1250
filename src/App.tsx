@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { Navbar } from "./components/Navbar";
 import { Home } from "./pages/Home";
 import { Practice } from "./pages/Practice";
@@ -13,6 +13,27 @@ import { PlayerProfile } from "./pages/PlayerProfile";
 import { Training } from "./pages/Training";
 import { TrainingArchive } from "./pages/TrainingArchive";
 import { useAppStore } from "./store/useAppStore";
+import { useTournamentStore } from "./store/useTournamentStore";
+
+function LoadActiveTournament() {
+  const location = useLocation();
+  const loadTournament = useTournamentStore((s) => s.loadTournament);
+  const tournament = useTournamentStore((s) => s.tournament);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+    if (id) {
+      loadTournament(id);
+      return;
+    }
+    if (!tournament && (location.pathname.startsWith("/tournament"))) {
+      useTournamentStore.getState().loadActiveTournament();
+    }
+  }, [location.search, location.pathname, loadTournament, tournament]);
+
+  return null;
+}
 
 export default function App() {
   const loadData = useAppStore((state) => state.loadData);
@@ -23,6 +44,7 @@ export default function App() {
 
   return (
     <Router>
+      <LoadActiveTournament />
       <div className="min-h-screen bg-cyber-bg">
         <Navbar />
         <Routes>
