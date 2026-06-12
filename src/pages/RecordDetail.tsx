@@ -127,6 +127,16 @@ export function RecordDetail() {
             <ArrowLeft size={20} />
             返回排行榜
           </button>
+          <div className="flex-1" />
+          {currentRecord && (
+            <Link
+              to={`/player/${encodeURIComponent(currentRecord.playerName)}`}
+              className="flex items-center gap-2 text-cyber-secondary hover:text-cyber-secondary/80 text-sm transition-colors"
+            >
+              <Clock size={16} />
+              {currentRecord.playerName} 的玩家面板
+            </Link>
+          )}
         </div>
 
         <div className="mb-10">

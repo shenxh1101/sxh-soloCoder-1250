@@ -9,6 +9,8 @@ import { TournamentSetup } from "./pages/TournamentSetup";
 import { TournamentPlay } from "./pages/TournamentPlay";
 import { TournamentResult } from "./pages/TournamentResult";
 import { RecordDetail } from "./pages/RecordDetail";
+import { PlayerProfile } from "./pages/PlayerProfile";
+import { Training } from "./pages/Training";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
           <Route path="/custom" element={<CustomCode />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/record/:id" element={<RecordDetail />} />
+          <Route path="/player/:name?" element={<PlayerProfile />} />
+          <Route path="/training/:name" element={<Training />} />
           <Route path="/tournament" element={<TournamentSetup />} />
           <Route path="/tournament/play" element={<TournamentPlay />} />
           <Route path="/tournament/result" element={<TournamentResult />} />
