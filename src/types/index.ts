@@ -55,3 +55,21 @@ export interface CharState {
   char: string;
   status: 'pending' | 'correct' | 'incorrect' | 'current';
 }
+
+export interface TournamentPlayer {
+  name: string;
+  record?: TypingRecord;
+  finished: boolean;
+}
+
+export type TournamentStatus = 'setup' | 'in_progress' | 'finished';
+
+export interface Tournament {
+  id: string;
+  snippetId: string;
+  snippetTitle: string;
+  players: TournamentPlayer[];
+  currentPlayerIndex: number;
+  status: TournamentStatus;
+  createdAt: number;
+}

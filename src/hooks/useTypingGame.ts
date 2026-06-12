@@ -28,6 +28,10 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
   
   const timerRef = useRef<number | null>(null);
   const isCompletedRef = useRef(false);
+  const correctCharsRef = useRef(0);
+  const charStatesRef = useRef<CharState[]>([]);
+  const errorsRef = useRef<KeyError[]>([]);
+  const pauseResumeKeyRef = useRef(false);
 
   const totalChars = snippet?.code.length || 0;
 
@@ -65,6 +69,18 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
     };
   }, [status, startTime]);
 
+  useEffect(() => {
+    correctCharsRef.current = correctChars;
+  }, [correctChars]);
+
+  useEffect(() => {
+    charStatesRef.current = charStates;
+  }, [charStates]);
+
+  useEffect(() => {
+    errorsRef.current = errors;
+  }, [errors]);
+
   const finishGame = useCallback(() => {
     if (isCompletedRef.current) return;
     isCompletedRef.current = true;
@@ -76,25 +92,61 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
     }
     
     const totalTime = startTime ? (Date.now() - startTime) / 1000 : 0;
-    const cpm = totalTime > 0 ? Math.round((correctChars / totalTime) * 60) : 0;
-    const accuracy = totalChars > 0 ? Math.round((correctChars / totalChars) * 1000) / 10 : 0;
+    const finalCorrectChars = correctCharsRef.current;
+    const finalCharStates = charStatesRef.current;
+    const finalErrors = errorsRef.current;
     
-    const funcStats = calculateFunctionStats(functions, charStates);
+    const cpm = totalTime > 0 ? Math.round((finalCorrectChars / totalTime) * 60) : 0;
+    const accuracy = totalChars > 0 ? Math.round((finalCorrectChars / totalChars) * 1000) / 10 : 0;
+    
+    const funcStats = calculateFunctionStats(functions, finalCharStates);
     
     onComplete?.({
       cpm,
       accuracy,
       totalTime,
       totalChars,
-      correctChars,
-      errorCount: errors.reduce((sum, e) => sum + e.count, 0),
-      errors,
+      correctChars: finalCorrectChars,
+      errorCount: finalErrors.reduce((sum, e) => sum + e.count, 0),
+      errors: finalErrors,
       functionStats: funcStats,
     });
-  }, [startTime, correctChars, totalChars, errors, functions, charStates, onComplete]);
+  }, [startTime, totalChars, functions, onComplete]);
+
+  const startGame = useCallback(() => {
+    if (status === 'idle') {
+      setStatus('playing');
+      setStartTime(Date.now());
+      
+      setCharStates((states) => {
+        const newStates = [...states];
+        if (newStates.length > 0) {
+          newStates[0] = { ...newStates[0], status: 'current' };
+        }
+        return newStates;
+      });
+    }
+  }, [status]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!snippet || status === 'finished') return;
+    
+    if (status === 'idle') {
+      return;
+    }
+    
+    if (status === 'paused') {
+      setStatus('playing');
+      pauseResumeKeyRef.current = true;
+      setTimeout(() => {
+        pauseResumeKeyRef.current = false;
+      }, 50);
+      return;
+    }
+    
+    if (pauseResumeKeyRef.current) {
+      return;
+    }
     
     if (e.key === 'Backspace') {
       e.preventDefault();
@@ -108,6 +160,9 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
           const newStates = [...states];
           newStates[currentIndex - 1] = { ...newStates[currentIndex - 1], status: 'pending' };
           newStates[currentIndex] = { ...newStates[currentIndex], status: 'pending' };
+          if (currentIndex - 1 >= 0) {
+            newStates[currentIndex - 1] = { ...newStates[currentIndex - 1], status: 'current' };
+          }
           return newStates;
         });
         
@@ -119,15 +174,6 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
     if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Tab') return;
     
     e.preventDefault();
-    
-    if (status === 'idle') {
-      setStatus('playing');
-      setStartTime(Date.now());
-    }
-    
-    if (status === 'paused') {
-      setStatus('playing');
-    }
     
     const expectedChar = snippet.code[currentIndex];
     let typedChar = e.key;
@@ -179,7 +225,7 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
     setCurrentIndex(nextIndex);
     
     if (nextIndex >= snippet.code.length) {
-      setTimeout(finishGame, 100);
+      setTimeout(finishGame, 50);
     }
   }, [snippet, status, currentIndex, charStates, finishGame]);
 
@@ -189,9 +235,6 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
         char,
         status: 'pending',
       }));
-      if (chars.length > 0) {
-        chars[0].status = 'current';
-      }
       setCharStates(chars);
       setCurrentIndex(0);
       setErrors([]);
@@ -200,6 +243,9 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
       setCorrectChars(0);
       setStatus('idle');
       isCompletedRef.current = false;
+      correctCharsRef.current = 0;
+      errorsRef.current = [];
+      charStatesRef.current = chars;
     }
   }, [snippet]);
 
@@ -215,6 +261,10 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
   const resume = useCallback(() => {
     if (status === 'paused') {
       setStatus('playing');
+      pauseResumeKeyRef.current = true;
+      setTimeout(() => {
+        pauseResumeKeyRef.current = false;
+      }, 50);
     }
   }, [status]);
 
@@ -238,6 +288,7 @@ export function useTypingGame({ snippet, onComplete }: UseTypingGameOptions) {
     progress,
     functions,
     handleKeyDown,
+    startGame,
     reset,
     pause,
     resume,

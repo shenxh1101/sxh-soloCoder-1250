@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Code2, Trophy, Plus, User, ChevronDown } from 'lucide-react';
+import { Code2, Trophy, Plus, User, ChevronDown, Users } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 
@@ -12,6 +12,7 @@ export function Navbar() {
 
   const navItems = [
     { path: '/', label: '题库', icon: Code2 },
+    { path: '/tournament', label: '比赛', icon: Users },
     { path: '/leaderboard', label: '排行榜', icon: Trophy },
     { path: '/custom', label: '添加代码', icon: Plus },
   ];

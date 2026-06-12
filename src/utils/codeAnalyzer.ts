@@ -64,22 +64,50 @@ function extractPythonFunctions(code: string, functions: FunctionStat[]) {
 }
 
 function extractJavaScriptFunctions(code: string, functions: FunctionStat[]) {
-  const patterns = [
-    /function\s+(\w+)\s*\(/g,
-    /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>|\w+\s*=>)/g,
-    /(\w+)\s*:\s*(?:async\s+)?function/g,
-    /(\w+)\s*\([^)]*\)\s*\{/g,
+  const jsKeywords = new Set([
+    'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'try', 'catch',
+    'finally', 'with', 'typeof', 'instanceof', 'new', 'in', 'of', 'return',
+    'throw', 'break', 'continue', 'yield', 'await', 'async', 'function',
+    'class', 'extends', 'super', 'this', 'const', 'let', 'var', 'import',
+    'export', 'default', 'from', 'as', 'void', 'delete', 'debugger'
+  ]);
+
+  const patterns: Array<{ regex: RegExp; nameGroup: number }> = [
+    {
+      regex: /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(/gm,
+      nameGroup: 1,
+    },
+    {
+      regex: /^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:function\s*\(|\([^)]*\)\s*=>|\w+\s*=>)/gm,
+      nameGroup: 1,
+    },
+    {
+      regex: /^\s*(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{/gm,
+      nameGroup: 1,
+    },
   ];
   
   const found = new Set<string>();
   
-  for (const pattern of patterns) {
+  for (const { regex, nameGroup } of patterns) {
     let match;
-    const regex = new RegExp(pattern.source, pattern.flags);
+    const regexCopy = new RegExp(regex.source, regex.flags);
     
-    while ((match = regex.exec(code)) !== null) {
-      const funcName = match[1];
-      if (found.has(funcName)) continue;
+    while ((match = regexCopy.exec(code)) !== null) {
+      const funcName = match[nameGroup];
+      if (!funcName || found.has(funcName)) continue;
+      if (jsKeywords.has(funcName)) continue;
+      
+      const lineStart = code.substring(0, match.index).lastIndexOf('\n') + 1;
+      const line = code.substring(lineStart, match.index + match[0].length).trim();
+      
+      const controlFlowPatterns = [
+        /^if\s*\(/, /^else\s*if\s*\(/, /^for\s*\(/, /^while\s*\(/,
+        /^do\s*$/, /^switch\s*\(/, /^case\s+/, /^catch\s*\(/,
+        /^try\s*$/, /^finally\s*$/, /^with\s*\(/
+      ];
+      if (controlFlowPatterns.some(p => line.match(p))) continue;
+      
       found.add(funcName);
       
       const startIndex = match.index;

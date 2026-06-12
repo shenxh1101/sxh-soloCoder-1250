@@ -1,4 +1,5 @@
-import { Trophy, Medal, Clock, Zap, Target } from 'lucide-react';
+import { Trophy, Medal, Clock, Zap, Target, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { TypingRecord, CodeSnippet } from '../types';
 
 interface LeaderboardProps {
@@ -9,6 +10,7 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({ records, snippets, selectedSnippetId, onSelectSnippet }: LeaderboardProps) {
+  const navigate = useNavigate();
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -89,7 +91,8 @@ export function Leaderboard({ records, snippets, selectedSnippetId, onSelectSnip
           {sortedRecords.map((record, index) => (
             <div
               key={record.id}
-              className={`p-4 rounded-xl border ${getRankStyle(index + 1)} transition-all hover:scale-[1.01]`}
+              onClick={() => navigate(`/record/${record.id}`)}
+              className={`p-4 rounded-xl border ${getRankStyle(index + 1)} transition-all hover:scale-[1.01] hover:border-cyber-primary/50 cursor-pointer`}
             >
               <div className="flex items-center gap-4">
                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
@@ -126,6 +129,8 @@ export function Leaderboard({ records, snippets, selectedSnippetId, onSelectSnip
                     <Clock size={14} />
                     <span className="font-mono">{formatTime(record.totalTime)}</span>
                   </div>
+
+                  <ChevronRight size={18} className="text-cyber-textMuted opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             </div>
