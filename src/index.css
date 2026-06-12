@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: #e0e0e0;
+  background-color: #0a0a0f;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0f 0%, #12121a 50%, #0a0a0f 100%);
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #12121a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a3a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4a;
+}
+
+/* 选择文本样式 */
+::selection {
+  background: rgba(0, 255, 213, 0.3);
+  color: #fff;
+}
+
+/* 代码字体 */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+}
+
+/* 霓虹发光文字效果 */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 255, 213, 0.5), 0 0 20px rgba(0, 255, 213, 0.3);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 10px rgba(255, 71, 87, 0.5), 0 0 20px rgba(255, 71, 87, 0.3);
+}
+
+/* 卡片霓虹边框效果 */
+.card-neon {
+  position: relative;
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.card-neon:hover {
+  border-color: rgba(0, 255, 213, 0.5);
+  box-shadow: 0 0 20px rgba(0, 255, 213, 0.1), inset 0 0 20px rgba(0, 255, 213, 0.03);
+}
+
+/* 输入框样式 */
+.input-cyber {
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.input-cyber:focus {
+  outline: none;
+  border-color: #00ffd5;
+  box-shadow: 0 0 0 3px rgba(0, 255, 213, 0.1);
+}
+
+/* 按钮基础样式 */
+.btn-cyber {
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  padding: 10px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cyber:hover {
+  border-color: #00ffd5;
+  color: #00ffd5;
+  box-shadow: 0 0 15px rgba(0, 255, 213, 0.2);
+}
+
+.btn-cyber-primary {
+  background: linear-gradient(135deg, rgba(0, 255, 213, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  border: 1px solid #00ffd5;
+  color: #00ffd5;
+}
+
+.btn-cyber-primary:hover {
+  background: linear-gradient(135deg, rgba(0, 255, 213, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+  box-shadow: 0 0 20px rgba(0, 255, 213, 0.3);
+}
+
+.btn-cyber-error {
+  border-color: #ff4757;
+  color: #ff4757;
+}
+
+.btn-cyber-error:hover {
+  background: rgba(255, 71, 87, 0.1);
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.2);
+}
+
+/* 页面动画 */
+.page-enter {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 网格背景 */
+.bg-grid {
+  background-image: 
+    linear-gradient(rgba(0, 255, 213, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 213, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
