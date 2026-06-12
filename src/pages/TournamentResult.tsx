@@ -106,6 +106,16 @@ export function TournamentResult() {
     return char;
   };
 
+  const winner = finishedPlayers[0];
+  const second = finishedPlayers[1];
+  const cpmGap = winner && second ? (winner.record?.cpm ?? 0) - (second.record?.cpm ?? 0) : 0;
+  const accGap = winner && second ? (winner.record?.accuracy ?? 0) - (second.record?.accuracy ?? 0) : 0;
+
+  const handleSameSnippet = () => {
+    resetTournament();
+    navigate(`/tournament?snippet=${encodeURIComponent(tournament.snippetId)}`);
+  };
+
   return (
     <div className="page-enter pt-24 pb-12 min-h-screen">
       <div className="max-w-5xl mx-auto px-6">
@@ -155,8 +165,7 @@ export function TournamentResult() {
               玩家对比
             </h2>
 
-            <div className="space-y-6">
-              <div>
+            <div className="space-y-6">              <div>
                 <h3 className="text-sm text-cyber-primary font-semibold mb-3 flex items-center gap-2">
                   <Zap size={14} />
                   CPM 对比
@@ -284,6 +293,182 @@ export function TournamentResult() {
                   </div>
                 </div>
               )}
+
+              {winner && second && (
+                <div className="mt-6 p-5 rounded-xl bg-gradient-to-br from-cyber-bgAlt/60 to-transparent border border-cyber-border/60">
+                  <h3 className="text-sm font-semibold text-cyber-text mb-4 flex items-center gap-2">
+                    <Award size={16} className="text-yellow-400" />
+                    胜负关键差距 — {winner.name} vs {second.name}
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 px-3 py-2 bg-cyber-bg rounded-lg">
+                      <Zap size={16} className="text-cyber-primary flex-shrink-0" />
+                      <span className="text-sm text-cyber-text flex-1">速度差距</span>
+                      <span className="text-sm">
+                        <span className="text-cyber-primary font-bold">{winner.name}</span>
+                        {cpmGap > 0 ? ' 比 ' : cpmGap < 0 ? ' 比 ' : ' 与 '}
+                        <span className="text-cyber-text">{second.name}</span>
+                        {cpmGap > 0 ? (
+                          <span className="text-cyber-success ml-1">快 {cpmGap} CPM</span>
+                        ) : cpmGap < 0 ? (
+                          <span className="text-cyber-error ml-1">慢 {Math.abs(cpmGap)} CPM</span>
+                        ) : (
+                          <span className="text-cyber-textMuted ml-1">持平</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 px-3 py-2 bg-cyber-bg rounded-lg">
+                      <Target size={16} className="text-cyber-success flex-shrink-0" />
+                      <span className="text-sm text-cyber-text flex-1">正确率差距</span>
+                      <span className="text-sm">
+                        {accGap > 0.5 ? (
+                          <>
+                            <span className="text-cyber-success font-bold">{winner.name}</span>
+                            <span className="ml-1">高 {accGap.toFixed(1)}%</span>
+                          </>
+                        ) : accGap < -0.5 ? (
+                          <>
+                            <span className="text-cyber-error font-bold">{second.name}</span>
+                            <span className="ml-1">反而高 {Math.abs(accGap).toFixed(1)}%</span>
+                          </>
+                        ) : (
+                          <span className="text-cyber-textMuted">几乎相同</span>
+                        )}
+                      </span>
+                    </div>
+                    {functionLosses.length > 0 && (
+                      <div className="flex items-start gap-3 px-3 py-2 bg-cyber-bg rounded-lg">
+                        <Code size={16} className="text-cyber-warning mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-cyber-text mb-1">最大函数失分</p>
+                          <p className="text-xs text-cyber-textMuted">
+                            <span className="text-cyber-error">{functionLosses[0].player}</span> 在
+                            <span className="font-mono text-cyber-warning mx-1">{functionLosses[0].name}()</span>
+                            上失分最多，正确率低 {functionLosses[0].loss.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {winner.record && second.record && (
+                      <div className="flex items-start gap-3 px-3 py-2 bg-cyber-bg rounded-lg">
+                        <Clock size={16} className="text-cyber-secondary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-cyber-text mb-1">用时差异</p>
+                          <p className="text-xs text-cyber-textMuted">
+                            {winner.name} 用时
+                            <span className="text-cyber-secondary mx-1">{formatTime(winner.record.totalTime)}</span>
+                            ，{second.name} 用时
+                            <span className="text-cyber-secondary mx-1">{formatTime(second.record.totalTime)}</span>
+                            {winner.record.totalTime < second.record.totalTime && (
+                              <span className="text-cyber-success ml-1">
+                                （节省 {formatTime(second.record.totalTime - winner.record.totalTime)}）
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {finishedPlayers.length > 0 && (
+          <div className="card-neon p-6 mb-8">
+            <h2 className="text-xl font-bold text-cyber-text mb-6 flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-cyber-warning" />
+              失误摘要
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {finishedPlayers.map((p) => (
+                <div
+                  key={p.name}
+                  className={`p-4 rounded-xl border ${
+                    p === winner
+                      ? 'border-yellow-500/40 bg-gradient-to-br from-yellow-500/10 to-transparent'
+                      : 'border-cyber-border bg-cyber-bg/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    {p === winner && <Trophy size={16} className="text-yellow-400" />}
+                    <span className="font-semibold text-cyber-text">{p.name}</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-1.5">
+                        最高频错误
+                      </p>
+                      {p.record && p.record.errors.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {p.record.errors.slice(0, 3).map((err, i) => (
+                            <div key={i} className="flex items-center gap-2 text-sm">
+                              <span className="w-4 text-[10px] text-cyber-textMuted">{i + 1}</span>
+                              <span className="font-mono text-cyber-error">
+                                {displayChar(err.expected)}
+                              </span>
+                              <span className="text-cyber-textMuted text-xs">→</span>
+                              <span className="font-mono text-cyber-warning">
+                                {displayChar(err.typed)}
+                              </span>
+                              <span className="ml-auto text-xs text-cyber-textMuted">×{err.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-cyber-success">🎉 零失误，完美表现！</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-cyber-textMuted mb-1.5">
+                        最薄弱函数
+                      </p>
+                      {p.record && p.record.functionStats.filter(f => f.totalChars > 0).length > 0 ? (
+                        (() => {
+                          const weakFuncs = p.record.functionStats
+                            .filter(f => f.totalChars > 0)
+                            .sort((a, b) => a.accuracy - b.accuracy)
+                            .slice(0, 2);
+                          return (
+                            <div className="space-y-1.5">
+                              {weakFuncs.map((f, i) => (
+                                <div key={i} className="flex items-center gap-2 text-sm">
+                                  <span className="font-mono text-cyber-text">{f.name}()</span>
+                                  <span
+                                    className={`ml-auto text-xs font-mono ${
+                                      f.accuracy >= 90
+                                        ? 'text-cyber-success'
+                                        : f.accuracy >= 70
+                                          ? 'text-cyber-warning'
+                                          : 'text-cyber-error'
+                                    }`}
+                                  >
+                                    {f.accuracy.toFixed(1)}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <p className="text-xs text-cyber-textMuted">未检测到函数</p>
+                      )}
+                    </div>
+                    {p.record && (
+                      <div className="pt-2 border-t border-cyber-border/30 text-xs text-cyber-textMuted space-y-0.5">
+                        <p>总错误数：<span className="text-cyber-error">{p.record.errorCount}</span> 次</p>
+                        <p>
+                          错误类型：
+                          <span className="text-cyber-primary">
+                            {p.record.errors.length}
+                          </span> 种
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -426,7 +611,7 @@ export function TournamentResult() {
           })}
         </div>
 
-        <div className="flex gap-4 justify-center">
+        <div className="flex flex-wrap gap-4 justify-center">
           <button
             onClick={() => {
               resetTournament();
@@ -436,6 +621,13 @@ export function TournamentResult() {
           >
             <Home size={18} />
             返回首页
+          </button>
+          <button
+            onClick={handleSameSnippet}
+            className="btn-cyber px-8 flex items-center gap-2 border-cyber-secondary/50 text-cyber-secondary hover:bg-cyber-secondary/10"
+          >
+            <Zap size={18} />
+            同题再战
           </button>
           <button
             onClick={handleNewTournament}

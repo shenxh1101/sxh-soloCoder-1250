@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, Code2, Play, Plus, X, Trophy, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useTournamentStore } from '../store/useTournamentStore';
@@ -8,13 +8,25 @@ import { SnippetCard } from '../components/SnippetCard';
 
 export function TournamentSetup() {
   const navigate = useNavigate();
-  const { snippets } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const preselectId = searchParams.get('snippet');
+  const { snippets, getSnippetById } = useAppStore();
   const { createTournament } = useTournamentStore();
-  
+
   const [step, setStep] = useState<'snippet' | 'players'>('snippet');
   const [selectedSnippet, setSelectedSnippet] = useState<CodeSnippet | null>(null);
   const [playerNames, setPlayerNames] = useState<string[]>(['Player1']);
   const [newPlayerName, setNewPlayerName] = useState('');
+
+  useEffect(() => {
+    if (preselectId && !selectedSnippet) {
+      const snip = getSnippetById(preselectId);
+      if (snip) {
+        setSelectedSnippet(snip);
+        setStep('players');
+      }
+    }
+  }, [preselectId, getSnippetById, selectedSnippet]);
 
   const handleAddPlayer = () => {
     const name = newPlayerName.trim();

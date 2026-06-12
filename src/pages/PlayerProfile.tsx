@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   User,
@@ -11,20 +11,25 @@ import {
   Play,
   ArrowLeft,
   Users,
+  ChevronDown,
+  ChevronUp,
+  Dumbbell,
+  ListChecks,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { TypingRecord } from '../types';
 
 const displayChar = (char: string) => {
   if (char === '\n') return '↵';
-  if (char === '\t') return '→';
+  if (char === '\t') return '⇥';
   if (char === ' ') return '␣';
   return char;
 };
 
 function TrendArrow({ current, previous }: { current: number; previous: number }) {
-  if (current > previous) return <span className="text-cyber-success text-xs">↑</span>;
-  if (current < previous) return <span className="text-cyber-error text-xs">↓</span>;
-  return <span className="text-cyber-textMuted text-xs">→</span>;
+  if (current > previous) return <span className="text-cyber-success text-xs" title="变好">↑</span>;
+  if (current < previous) return <span className="text-cyber-error text-xs" title="变差">↓</span>;
+  return <span className="text-cyber-textMuted text-xs" title="持平">→</span>;
 }
 
 function MiniBarChart({
@@ -55,10 +60,79 @@ function MiniBarChart({
   );
 }
 
+interface ErrorTrendItem {
+  key: string;
+  expected: string;
+  typed: string;
+  totalCount: number;
+  perRecord: { recordId: string; count: number; date: string }[];
+}
+
+interface FunctionTrendItem {
+  name: string;
+  avgAccuracy: number;
+  perRecord: { recordId: string; accuracy: number; date: string }[];
+}
+
+function buildErrorTrends(records: TypingRecord[]): ErrorTrendItem[] {
+  const map = new Map<string, ErrorTrendItem>();
+
+  records.forEach((r) => {
+    const date = new Date(r.timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    r.errors.forEach((err) => {
+      const key = `${err.expected}→${err.typed}`;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          key,
+          expected: err.expected,
+          typed: err.typed,
+          totalCount: err.count,
+          perRecord: [{ recordId: r.id, count: err.count, date }],
+        });
+      } else {
+        existing.totalCount += err.count;
+        existing.perRecord.push({ recordId: r.id, count: err.count, date });
+      }
+    });
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.totalCount - a.totalCount);
+}
+
+function buildFunctionTrends(records: TypingRecord[]): FunctionTrendItem[] {
+  const map = new Map<string, FunctionTrendItem>();
+
+  records.forEach((r) => {
+    const date = new Date(r.timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    r.functionStats.forEach((fs) => {
+      if (fs.totalChars === 0) return;
+      const existing = map.get(fs.name);
+      if (!existing) {
+        map.set(fs.name, {
+          name: fs.name,
+          avgAccuracy: fs.accuracy,
+          perRecord: [{ recordId: r.id, accuracy: fs.accuracy, date }],
+        });
+      } else {
+        const len = existing.perRecord.length;
+        existing.avgAccuracy = (existing.avgAccuracy * len + fs.accuracy) / (len + 1);
+        existing.perRecord.push({ recordId: r.id, accuracy: fs.accuracy, date });
+      }
+    });
+  });
+
+  return Array.from(map.values())
+    .map((f) => ({ ...f, avgAccuracy: Math.round(f.avgAccuracy * 10) / 10 }))
+    .sort((a, b) => a.avgAccuracy - b.avgAccuracy);
+}
+
 export function PlayerProfile() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const { records, players, currentPlayer, setCurrentPlayer } = useAppStore();
+  const { getRecordsForPlayer, players, currentPlayer, setCurrentPlayer } = useAppStore();
+  const [expandedError, setExpandedError] = useState<string | null>(null);
+  const [expandedFunc, setExpandedFunc] = useState<string | null>(null);
 
   const resolvedName = useMemo(() => {
     if (name) return decodeURIComponent(name);
@@ -68,12 +142,14 @@ export function PlayerProfile() {
   }, [name, currentPlayer, players]);
 
   const playerRecords = useMemo(
-    () =>
-      records
-        .filter((r) => r.playerName === resolvedName)
-        .sort((a, b) => a.timestamp - b.timestamp),
-    [records, resolvedName]
+    () => (resolvedName ? getRecordsForPlayer(resolvedName, 'challenge') : []),
+    [resolvedName, getRecordsForPlayer]
   );
+  const allPlayerRecords = useMemo(
+    () => (resolvedName ? getRecordsForPlayer(resolvedName) : []),
+    [resolvedName, getRecordsForPlayer]
+  );
+  const trainingCount = allPlayerRecords.length - playerRecords.length;
 
   const playerInfo = useMemo(
     () => players.find((p) => p.name === resolvedName),
@@ -95,46 +171,12 @@ export function PlayerProfile() {
     [playerRecords]
   );
 
-  const topErrors = useMemo(() => {
-    const errorMap = new Map<string, number>();
-    playerRecords.forEach((r) => {
-      r.errors.forEach((err) => {
-        const key = `${err.expected}→${err.typed}`;
-        errorMap.set(key, (errorMap.get(key) || 0) + err.count);
-      });
-    });
-    return Array.from(errorMap.entries())
-      .map(([key, count]) => ({ key, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [playerRecords]);
+  const errorTrends = useMemo(() => buildErrorTrends(playerRecords), [playerRecords]);
+  const functionTrends = useMemo(() => buildFunctionTrends(playerRecords), [playerRecords]);
 
-  const weakFunctions = useMemo(() => {
-    const funcMap = new Map<string, { totalAccuracy: number; count: number }>();
-    playerRecords.forEach((r) => {
-      r.functionStats.forEach((fs) => {
-        if (fs.totalChars > 0) {
-          const existing = funcMap.get(fs.name) || { totalAccuracy: 0, count: 0 };
-          funcMap.set(fs.name, {
-            totalAccuracy: existing.totalAccuracy + fs.accuracy,
-            count: existing.count + 1,
-          });
-        }
-      });
-    });
-    return Array.from(funcMap.entries())
-      .map(([name, data]) => ({
-        name,
-        avgAccuracy: Math.round((data.totalAccuracy / data.count) * 10) / 10,
-      }))
-      .sort((a, b) => a.avgAccuracy - b.avgAccuracy)
-      .slice(0, 5);
-  }, [playerRecords]);
-
-  const maxCpm = useMemo(
-    () => Math.max(...trend.map((t) => t.cpm), 100),
-    [trend]
-  );
+  const topErrorTrends = errorTrends.slice(0, 10);
+  const topFuncTrends = functionTrends.slice(0, 10);
+  const maxCpm = useMemo(() => Math.max(...trend.map((t) => t.cpm), 100), [trend]);
 
   const handlePlayerSwitch = (playerName: string) => {
     setCurrentPlayer(playerName);
@@ -195,17 +237,24 @@ export function PlayerProfile() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyber-primary/20 to-cyber-secondary/20 border border-cyber-primary/30 flex items-center justify-center">
             <User className="w-7 h-7 text-cyber-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-cyber-text">{resolvedName}</h1>
-            <p className="text-cyber-textMuted text-sm">玩家档案</p>
+            <p className="text-cyber-textMuted text-sm">玩家档案 · 仅显示正式挑战记录</p>
           </div>
+          <Link
+            to={`/training-archive/${encodeURIComponent(resolvedName)}`}
+            className="flex items-center gap-2 text-sm text-cyber-secondary hover:text-cyber-secondary/80 border border-cyber-secondary/40 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Dumbbell size={14} />
+            训练档案 ({trainingCount})
+          </Link>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="card-neon p-4">
             <div className="flex items-center gap-2 mb-2">
               <Trophy size={16} className="text-cyber-secondary" />
-              <span className="text-xs text-cyber-textMuted">总场次</span>
+              <span className="text-xs text-cyber-textMuted">挑战场次</span>
             </div>
             <p className="text-2xl font-bold text-cyber-text font-mono">
               {playerInfo?.totalGames ?? playerRecords.length}
@@ -231,12 +280,15 @@ export function PlayerProfile() {
           </div>
           <div className="card-neon p-4">
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp size={16} className="text-cyber-warning" />
-              <span className="text-xs text-cyber-textMuted">记录数</span>
+              <ListChecks size={16} className="text-cyber-warning" />
+              <span className="text-xs text-cyber-textMuted">训练场次</span>
             </div>
-            <p className="text-2xl font-bold text-cyber-warning font-mono">
-              {playerRecords.length}
-            </p>
+            <Link
+              to={`/training-archive/${encodeURIComponent(resolvedName)}`}
+              className="text-2xl font-bold text-cyber-warning font-mono hover:underline"
+            >
+              {trainingCount}
+            </Link>
           </div>
         </div>
 
@@ -244,7 +296,7 @@ export function PlayerProfile() {
           <div className="card-neon p-6 mb-8">
             <h2 className="text-xl font-bold text-cyber-text mb-6 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-cyber-secondary" />
-              趋势（最近 {trend.length} 次）
+              趋势（最近 {trend.length} 次正式挑战）
             </h2>
 
             <div className="grid md:grid-cols-2 gap-6">
@@ -368,34 +420,98 @@ export function PlayerProfile() {
           <div className="card-neon p-5">
             <h3 className="font-semibold text-cyber-text mb-4 flex items-center gap-2">
               <AlertTriangle size={18} className="text-cyber-error" />
-              最常错键位 Top 5
+              常错键位趋势（最近 {topErrorTrends.length} 项）
             </h3>
-            {topErrors.length > 0 ? (
+            {topErrorTrends.length > 0 ? (
               <div className="space-y-2">
-                {topErrors.map((err, i) => {
-                  const [expected, typed] = err.key.split('→');
-                  const maxCount = topErrors[0].count;
+                {topErrorTrends.map((err, i) => {
+                  const maxCount = topErrorTrends[0].totalCount;
+                  const isExpanded = expandedError === err.key;
+                  const lastIdx = err.perRecord.length - 1;
+                  const prevIdx = lastIdx - 1;
                   return (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="w-5 text-cyber-textMuted text-sm">{i + 1}.</span>
-                      <div className="flex items-center gap-2 w-24">
-                        <span className="px-2 py-0.5 bg-cyber-bg rounded font-mono text-sm text-cyber-text">
-                          {displayChar(expected)}
+                    <div key={err.key} className="rounded-lg bg-cyber-bg/50 overflow-hidden">
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-cyber-bg transition-colors"
+                        onClick={() => setExpandedError(isExpanded ? null : err.key)}
+                      >
+                        <span className="w-5 text-cyber-textMuted text-xs">{i + 1}.</span>
+                        <div className="flex items-center gap-1.5 w-24">
+                          <span className="px-1.5 py-0.5 bg-cyber-card rounded font-mono text-xs text-cyber-text">
+                            {displayChar(err.expected)}
+                          </span>
+                          <span className="text-cyber-textMuted text-xs">→</span>
+                          <span className="px-1.5 py-0.5 bg-cyber-error/20 rounded font-mono text-xs text-cyber-error">
+                            {displayChar(err.typed)}
+                          </span>
+                        </div>
+                        <div className="flex-1 h-2 bg-cyber-bg rounded overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyber-error/80 to-cyber-error/40"
+                            style={{ width: `${(err.totalCount / maxCount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="w-8 text-right text-xs text-cyber-textMuted font-mono">
+                          ×{err.totalCount}
                         </span>
-                        <span className="text-cyber-textMuted text-xs">→</span>
-                        <span className="px-2 py-0.5 bg-cyber-error/20 rounded font-mono text-sm text-cyber-error">
-                          {displayChar(typed)}
-                        </span>
+                        {lastIdx >= 0 && prevIdx >= 0 && (
+                          <span className="w-4 text-center">
+                            <TrendArrow
+                              current={err.perRecord[lastIdx].count}
+                              previous={err.perRecord[prevIdx].count}
+                            />
+                          </span>
+                        )}
+                        <button className="text-cyber-textMuted">
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
                       </div>
-                      <div className="flex-1 h-4 bg-cyber-bg rounded overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-cyber-error/80 to-cyber-error/40 rounded"
-                          style={{ width: `${(err.count / maxCount) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-10 text-right text-sm text-cyber-textMuted">
-                        {err.count}
-                      </span>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-1 border-t border-cyber-border/30">
+                          <p className="text-[10px] text-cyber-textMuted mb-2">
+                            出现的局次（最新在右）
+                          </p>
+                          <div className="flex items-end gap-1 h-16">
+                            {err.perRecord.slice(-10).map((pr, idx, arr) => {
+                              const maxRec = Math.max(...err.perRecord.map((r) => r.count), 1);
+                              return (
+                                <Link
+                                  key={pr.recordId}
+                                  to={`/record/${pr.recordId}`}
+                                  className="flex-1 flex flex-col items-center justify-end h-full group"
+                                  title={`${pr.date}: ${pr.count}次`}
+                                >
+                                  <div
+                                    className="w-full bg-cyber-error/60 rounded-t min-h-[2px] group-hover:bg-cyber-error transition-colors"
+                                    style={{ height: `${(pr.count / maxRec) * 100}%` }}
+                                  />
+                                  {idx === arr.length - 1 && arr.length > 1 && (
+                                    <div className="absolute w-4 -ml-4">
+                                      {idx > 0 && (
+                                        <TrendArrow
+                                          current={pr.count}
+                                          previous={arr[idx - 1].count}
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            {err.perRecord.slice(-10).map((pr) => (
+                              <Link
+                                key={pr.recordId}
+                                to={`/record/${pr.recordId}`}
+                                className="flex-1 text-center text-[9px] text-cyber-textMuted hover:text-cyber-primary truncate"
+                              >
+                                {pr.date}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -408,40 +524,102 @@ export function PlayerProfile() {
           <div className="card-neon p-5">
             <h3 className="font-semibold text-cyber-text mb-4 flex items-center gap-2">
               <Code size={18} className="text-cyber-warning" />
-              最薄弱函数（平均正确率最低）
+              薄弱函数趋势（{topFuncTrends.length} 个）
             </h3>
-            {weakFunctions.length > 0 ? (
-              <div className="space-y-2.5">
-                {weakFunctions.map((func, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="font-mono text-cyber-text">{func.name}()</span>
-                      <span
-                        className={`font-medium ${
-                          func.avgAccuracy >= 90
-                            ? 'text-cyber-success'
-                            : func.avgAccuracy >= 70
-                              ? 'text-cyber-warning'
-                              : 'text-cyber-error'
-                        }`}
-                      >
-                        {func.avgAccuracy.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-cyber-bg rounded-full overflow-hidden">
+            {topFuncTrends.length > 0 ? (
+              <div className="space-y-2">
+                {topFuncTrends.map((func, i) => {
+                  const isExpanded = expandedFunc === func.name;
+                  const lastIdx = func.perRecord.length - 1;
+                  const prevIdx = lastIdx - 1;
+                  const colorClass =
+                    func.avgAccuracy >= 90
+                      ? 'text-cyber-success'
+                      : func.avgAccuracy >= 70
+                        ? 'text-cyber-warning'
+                        : 'text-cyber-error';
+                  const barColor =
+                    func.avgAccuracy >= 90
+                      ? 'bg-cyber-success'
+                      : func.avgAccuracy >= 70
+                        ? 'bg-cyber-warning'
+                        : 'bg-cyber-error';
+                  return (
+                    <div key={func.name} className="rounded-lg bg-cyber-bg/50 overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${
-                          func.avgAccuracy >= 90
-                            ? 'bg-cyber-success'
-                            : func.avgAccuracy >= 70
-                              ? 'bg-cyber-warning'
-                              : 'bg-cyber-error'
-                        }`}
-                        style={{ width: `${func.avgAccuracy}%` }}
-                      />
+                        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-cyber-bg transition-colors"
+                        onClick={() => setExpandedFunc(isExpanded ? null : func.name)}
+                      >
+                        <span className="w-5 text-cyber-textMuted text-xs">{i + 1}.</span>
+                        <span className="font-mono text-xs text-cyber-text flex-1 min-w-0 truncate">
+                          {func.name}()
+                        </span>
+                        <div className="flex-1 h-2 bg-cyber-bg rounded-full overflow-hidden hidden sm:block">
+                          <div
+                            className={`h-full rounded-full ${barColor}`}
+                            style={{ width: `${func.avgAccuracy}%` }}
+                          />
+                        </div>
+                        <span className={`w-14 text-right text-xs font-mono font-medium ${colorClass}`}>
+                          {func.avgAccuracy.toFixed(1)}%
+                        </span>
+                        <span className="w-10 text-center text-[10px] text-cyber-textMuted">
+                          {func.perRecord.length}局
+                        </span>
+                        {lastIdx >= 0 && prevIdx >= 0 && (
+                          <span className="w-4 text-center">
+                            <TrendArrow
+                              current={func.perRecord[lastIdx].accuracy}
+                              previous={func.perRecord[prevIdx].accuracy}
+                            />
+                          </span>
+                        )}
+                        <button className="text-cyber-textMuted">
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-1 border-t border-cyber-border/30">
+                          <p className="text-[10px] text-cyber-textMuted mb-2">
+                            正确率变化（最近局，最新在右）
+                          </p>
+                          <div className="flex items-end gap-1 h-16">
+                            {func.perRecord.slice(-10).map((pr) => (
+                              <Link
+                                key={pr.recordId}
+                                to={`/record/${pr.recordId}`}
+                                className="flex-1 flex flex-col items-center justify-end h-full group"
+                                title={`${pr.date}: ${pr.accuracy.toFixed(1)}%`}
+                              >
+                                <div
+                                  className={`w-full rounded-t min-h-[2px] transition-colors ${
+                                    pr.accuracy >= 90
+                                      ? 'bg-cyber-success/70 group-hover:bg-cyber-success'
+                                      : pr.accuracy >= 70
+                                        ? 'bg-cyber-warning/70 group-hover:bg-cyber-warning'
+                                        : 'bg-cyber-error/70 group-hover:bg-cyber-error'
+                                  }`}
+                                  style={{ height: `${pr.accuracy}%` }}
+                                />
+                              </Link>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            {func.perRecord.slice(-10).map((pr) => (
+                              <Link
+                                key={pr.recordId}
+                                to={`/record/${pr.recordId}`}
+                                className="flex-1 text-center text-[9px] text-cyber-textMuted hover:text-cyber-primary truncate"
+                              >
+                                {pr.date}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-cyber-textMuted text-sm">历史记录中未检测到函数</p>
@@ -455,11 +633,18 @@ export function PlayerProfile() {
             className="btn-cyber-primary btn-cyber flex items-center gap-2"
           >
             <Play size={18} />
-            开始训练
+            开始专项训练
           </Link>
           <Link to="/leaderboard" className="btn-cyber flex items-center gap-2">
             <Trophy size={18} />
             排行榜
+          </Link>
+          <Link
+            to={`/training-archive/${encodeURIComponent(resolvedName)}`}
+            className="btn-cyber flex items-center gap-2"
+          >
+            <Dumbbell size={18} />
+            训练档案
           </Link>
         </div>
       </div>

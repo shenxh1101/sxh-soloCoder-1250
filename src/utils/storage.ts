@@ -45,12 +45,18 @@ export function saveTypingRecord(record: TypingRecord): void {
   const records = getTypingRecords();
   records.push(record);
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
-  updatePlayerStats(record);
+  if (!record.recordType || record.recordType === 'challenge') {
+    updatePlayerStats(record);
+  }
 }
 
-export function getRecordsBySnippet(snippetId: string): TypingRecord[] {
+export function getRecordsBySnippet(snippetId: string, recordType?: string): TypingRecord[] {
   return getTypingRecords()
-    .filter(r => r.snippetId === snippetId)
+    .filter(r => {
+      if (r.snippetId !== snippetId) return false;
+      if (recordType && (r as any).recordType && (r as any).recordType !== recordType) return false;
+      return true;
+    })
     .sort((a, b) => {
       if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
       if (b.cpm !== a.cpm) return b.cpm - a.cpm;
@@ -75,10 +81,14 @@ export function getPlayers(): Player[] {
   }
 }
 
+export function savePlayers(players: Player[]): void {
+  localStorage.setItem(PLAYERS_KEY, JSON.stringify(players));
+}
+
 export function updatePlayerStats(record: TypingRecord): void {
   const players = getPlayers();
   const existingIndex = players.findIndex(p => p.name === record.playerName);
-  
+
   if (existingIndex >= 0) {
     const player = players[existingIndex];
     player.totalGames++;
@@ -92,7 +102,7 @@ export function updatePlayerStats(record: TypingRecord): void {
       bestAccuracy: record.accuracy,
     });
   }
-  
+
   localStorage.setItem(PLAYERS_KEY, JSON.stringify(players));
 }
 

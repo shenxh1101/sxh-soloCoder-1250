@@ -11,6 +11,7 @@ import { TournamentResult } from "./pages/TournamentResult";
 import { RecordDetail } from "./pages/RecordDetail";
 import { PlayerProfile } from "./pages/PlayerProfile";
 import { Training } from "./pages/Training";
+import { TrainingArchive } from "./pages/TrainingArchive";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/record/:id" element={<RecordDetail />} />
           <Route path="/player/:name?" element={<PlayerProfile />} />
           <Route path="/training/:name" element={<Training />} />
+          <Route path="/training-archive/:name" element={<TrainingArchive />} />
           <Route path="/tournament" element={<TournamentSetup />} />
           <Route path="/tournament/play" element={<TournamentPlay />} />
           <Route path="/tournament/result" element={<TournamentResult />} />

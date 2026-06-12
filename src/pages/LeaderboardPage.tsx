@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Trophy, User } from 'lucide-react';
+import { Trophy, User, Dumbbell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { Leaderboard } from '../components/Leaderboard';
 
 export function LeaderboardPage() {
-  const { records, snippets, players } = useAppStore();
+  const { getChallengeRecords, snippets, players } = useAppStore();
+  const records = getChallengeRecords();
   const [selectedSnippetId, setSelectedSnippetId] = useState<string | null>(null);
 
   return (

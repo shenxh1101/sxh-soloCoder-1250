@@ -1,5 +1,6 @@
 export type Language = 'python' | 'javascript' | 'go' | 'rust' | 'java' | 'custom';
 export type Difficulty = 'easy' | 'medium' | 'hard';
+export type RecordType = 'challenge' | 'training';
 
 export interface CodeSnippet {
   id: string;
@@ -40,6 +41,7 @@ export interface TypingRecord {
   errors: KeyError[];
   functionStats: FunctionStat[];
   timestamp: number;
+  recordType: RecordType;
 }
 
 export interface Player {

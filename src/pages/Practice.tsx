@@ -1,22 +1,33 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, Play, Pause, Clock, Target, Zap, Timer } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, RotateCcw, Play, Pause, Clock, Target, Zap, Timer, Dumbbell, User } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useTypingGame } from '../hooks/useTypingGame';
 import { CodeDisplay } from '../components/CodeDisplay';
 import { StatsBar } from '../components/StatsBar';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { ReportDetail } from '../components/ReportDetail';
-import { TypingRecord, KeyError, FunctionStat } from '../types';
+import { TypingRecord, KeyError, FunctionStat, RecordType } from '../types';
 
 type CountdownState = 'none' | 'counting' | 'ready';
 
 export function Practice() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getSnippetById, currentPlayer, saveRecord, setCurrentRecord } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlPlayerName = searchParams.get('player');
+  const urlRecordType = searchParams.get('type') as RecordType | null;
+  const backTo = searchParams.get('backTo');
+
+  const { getSnippetById, currentPlayer, saveRecord, setCurrentRecord, getRecordsForPlayer } = useAppStore();
   const snippet = id ? getSnippetById(id) : undefined;
-  
+
+  const activePlayer = useMemo(() => urlPlayerName || currentPlayer, [urlPlayerName, currentPlayer]);
+  const activeRecordType: RecordType = useMemo(() => {
+    if (urlRecordType === 'training') return 'training';
+    return 'challenge';
+  }, [urlRecordType]);
+
   const [finishedRecord, setFinishedRecord] = useState<TypingRecord | null>(null);
   const [countdownState, setCountdownState] = useState<CountdownState>('none');
   const [countdown, setCountdown] = useState(3);
@@ -32,17 +43,18 @@ export function Practice() {
     functionStats: FunctionStat[];
   }) => {
     if (!snippet) return;
-    
+
     const record = saveRecord({
       snippetId: snippet.id,
       snippetTitle: snippet.title,
-      playerName: currentPlayer,
+      playerName: activePlayer,
+      recordType: activeRecordType,
       ...stats,
     });
-    
+
     setCurrentRecord(record);
     setFinishedRecord(record);
-  }, [snippet, currentPlayer, saveRecord, setCurrentRecord]);
+  }, [snippet, activePlayer, activeRecordType, saveRecord, setCurrentRecord]);
 
   const {
     status,
@@ -105,7 +117,11 @@ export function Practice() {
   };
 
   const handleBack = () => {
-    navigate('/');
+    if (backTo) {
+      navigate(backTo);
+    } else {
+      navigate('/');
+    }
   };
 
   if (!snippet) {
@@ -125,12 +141,25 @@ export function Practice() {
     return (
       <div className="min-h-screen pt-24 pb-12">
         <div className="max-w-5xl mx-auto px-6">
+          <div className="mb-4 flex items-center justify-center gap-2">
+            {finishedRecord.recordType === 'training' ? (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-cyber-secondary/15 text-cyber-secondary border border-cyber-secondary/30 flex items-center gap-1">
+                <Dumbbell size={12} />
+                专项训练
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-cyber-primary/15 text-cyber-primary border border-cyber-primary/30 flex items-center gap-1">
+                <Zap size={12} />
+                正式挑战
+              </span>
+            )}
+          </div>
           <ReportDetail
             record={finishedRecord}
             onReplay={handleReplay}
             onBack={handleBack}
           />
-          <div className="flex justify-center mt-6">
+          <div className="flex justify-center gap-4 mt-6">
             <button
               onClick={() => navigate(`/record/${finishedRecord.id}`)}
               className="text-cyber-secondary hover:text-cyber-secondary/80 text-sm flex items-center gap-1 transition-colors"
@@ -138,6 +167,23 @@ export function Practice() {
               <Timer size={16} />
               查看历史趋势分析
             </button>
+            {finishedRecord.recordType === 'training' ? (
+              <button
+                onClick={() => navigate(`/training-archive/${encodeURIComponent(finishedRecord.playerName)}`)}
+                className="text-cyber-primary hover:text-cyber-primary/80 text-sm flex items-center gap-1 transition-colors"
+              >
+                <Dumbbell size={16} />
+                查看训练档案
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate(`/player/${encodeURIComponent(finishedRecord.playerName)}`)}
+                className="text-cyber-primary hover:text-cyber-primary/80 text-sm flex items-center gap-1 transition-colors"
+              >
+                <User size={16} />
+                查看玩家面板
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -160,7 +206,14 @@ export function Practice() {
           </button>
           
           <div className="text-center">
-            <h1 className="font-semibold text-cyber-text">{snippet.title}</h1>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <h1 className="font-semibold text-cyber-text">{snippet.title}</h1>
+              {activeRecordType === 'training' && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-cyber-secondary/15 text-cyber-secondary border border-cyber-secondary/30">
+                  专项训练
+                </span>
+              )}
+            </div>
             <p className="text-xs text-cyber-textMuted capitalize">{snippet.language}</p>
           </div>
           
@@ -205,13 +258,25 @@ export function Practice() {
               currentIndex={currentIndex}
             />
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="card-neon p-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-cyber-textMuted mb-1">
+                  <Dumbbell size={16} />
+                  <span className="text-xs uppercase tracking-wider">类型</span>
+                </div>
+                <div className={`text-2xl font-bold ${activeRecordType === 'training' ? 'text-cyber-secondary' : 'text-cyber-primary'}`}>
+                  {activeRecordType === 'training' ? '训练' : '挑战'}
+                </div>
+                <div className="text-xs text-cyber-textMuted">
+                  {activeRecordType === 'training' ? '不计入排行' : '计入排行榜'}
+                </div>
+              </div>
               <div className="card-neon p-4 text-center">
                 <div className="flex items-center justify-center gap-2 text-cyber-textMuted mb-1">
                   <Clock size={16} />
                   <span className="text-xs uppercase tracking-wider">代码长度</span>
                 </div>
-                <div className="text-3xl font-bold text-cyber-primary">
+                <div className="text-2xl font-bold text-cyber-primary">
                   {totalChars}
                 </div>
                 <div className="text-xs text-cyber-textMuted">字符</div>
@@ -221,7 +286,7 @@ export function Practice() {
                   <Zap size={16} />
                   <span className="text-xs uppercase tracking-wider">预估时间</span>
                 </div>
-                <div className="text-3xl font-bold text-cyber-secondary">
+                <div className="text-2xl font-bold text-cyber-secondary">
                   ~{Math.max(1, Math.ceil(totalChars / 300))}
                 </div>
                 <div className="text-xs text-cyber-textMuted">分钟</div>
@@ -231,10 +296,12 @@ export function Practice() {
                   <Target size={16} />
                   <span className="text-xs uppercase tracking-wider">玩家</span>
                 </div>
-                <div className="text-3xl font-bold text-cyber-success">
-                  {currentPlayer}
+                <div className="text-2xl font-bold text-cyber-success">
+                  {activePlayer}
                 </div>
-                <div className="text-xs text-cyber-textMuted">准备就绪</div>
+                <div className="text-xs text-cyber-textMuted">
+                  {urlPlayerName && urlPlayerName !== currentPlayer ? '专项指定' : '准备就绪'}
+                </div>
               </div>
             </div>
           )}

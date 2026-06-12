@@ -190,7 +190,9 @@ export function Training() {
   const playerName = name ?? 'Player';
 
   const analysis = useMemo(() => {
-    const playerRecords = records.filter((r) => r.playerName === playerName);
+    const playerRecords = records.filter(
+      (r) => r.playerName === playerName && r.recordType === 'challenge'
+    );
 
     if (playerRecords.length === 0) {
       return { errors: [] as ErrorPair[], weakFuncs: [] as WeakFunction[], hasData: false };
@@ -221,7 +223,10 @@ export function Training() {
     const snippets = useAppStore.getState().snippets;
     const added = snippets[snippets.length - 1];
     if (added) {
-      navigate(`/practice/${added.id}`);
+      const backTo = `/training-archive/${encodeURIComponent(playerName)}`;
+      navigate(
+        `/practice/${added.id}?player=${encodeURIComponent(playerName)}&type=training&backTo=${encodeURIComponent(backTo)}`
+      );
     }
   };
 
